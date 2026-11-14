@@ -5,6 +5,9 @@
 <meta name="apple-mobile-web-app-title" content="Unibunny">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#EEE9F5">
+<meta name="mobile-web-app-capable" content="yes">
 <title>兔兔獨角獸數學學院</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&family=Bpmf+Huninn&family=Quicksand:wght@500;700&display=swap">
@@ -334,15 +337,33 @@ function tx(v){
 
 /* ---------- sound ---------- */
 let AC = null;
+/* iOS silent switch: audioSession "playback" (Safari 17+) */
+try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch(e){}
+function audioCtx(){
+  AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+  return AC;
+}
+/* unlock audio on first touch */
+function unlockAudio(){
+  try {
+    const c = audioCtx();
+    if (c.state !== "running") c.resume();
+    const b = c.createBuffer(1,1,22050), src = c.createBufferSource();
+    src.buffer = b; src.connect(c.destination); src.start(0);
+  } catch(e){}
+}
+["pointerdown","touchend","keydown"].forEach(ev=>document.addEventListener(ev, unlockAudio, {capture:true, passive:true}));
 function tone(f1,f2,dur,type,vol,delay){
   if (muted) return;
   try {
-    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
-    if (AC.state === "suspended") AC.resume();
-    const t = AC.currentTime + (delay||0), o = AC.createOscillator(), g = AC.createGain();
-    o.type = type||"sine"; o.frequency.setValueAtTime(f1,t); o.frequency.linearRampToValueAtTime(f2,t+dur);
-    g.gain.setValueAtTime(vol||.14,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
-    o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+dur+.02);
+    const c = audioCtx();
+    const play = ()=>{
+      const t = c.currentTime + (delay||0), o = c.createOscillator(), g = c.createGain();
+      o.type = type||"sine"; o.frequency.setValueAtTime(f1,t); o.frequency.linearRampToValueAtTime(f2,t+dur);
+      g.gain.setValueAtTime(vol||.14,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+.02);
+    };
+    if (c.state !== "running") c.resume().then(play, ()=>{}); else play();
   } catch(e){}
 }
 const sfx = {
